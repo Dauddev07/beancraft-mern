@@ -15,15 +15,7 @@ function Cart() {
   useEffect(() => {
     if (cart.length === 0 && !isOrdering) {
       showAlert("Your cart is empty");
-
-      navigate("/");
-
-      setTimeout(() => {
-        const section = document.getElementById("categories");
-        if (section) {
-          section.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 200);
+      navigate("/", { replace: true, state: { scrollToId: "categories" } });
     }
   }, [cart, isOrdering, navigate]);
 

@@ -35,10 +35,29 @@ function Home() {
   const loadGen = useRef(0);
   const [refetchTick, setRefetchTick] = useState(0);
 
+  const scrollMotion = () =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+
+  const scrollToSectionWithOffset = (id, behavior = scrollMotion()) => {
+    const section = document.getElementById(id);
+    if (!section) return false;
+
+    const headerOffset =
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--site-header-offset")) ||
+      0;
+    const top = section.getBoundingClientRect().top + window.scrollY - headerOffset - 8;
+
+    window.scrollTo({
+      top: Math.max(0, top),
+      behavior,
+    });
+    return true;
+  };
+
   /**
    * From a long page (e.g. profile at bottom) SPA scroll position persists.
    * ScrollToTop skips `/` when scrollToId is set, so we must reset the window
-   * before scrollIntoView or the target section never comes into view reliably.
+   * before section scrolling or the target section may not come into view reliably.
    */
   useLayoutEffect(() => {
     const id = location.state?.scrollToId;
@@ -48,26 +67,37 @@ function Home() {
 
     window.scrollTo(0, 0);
 
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const behavior = prefersReduced ? "auto" : "smooth";
+    const behavior = scrollMotion();
+    let attempts = 0;
+    let retryTimer = null;
 
-    const scrollToTarget = () => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.scrollIntoView({ behavior, block: "start" });
+    const alignToTarget = () => {
+      attempts += 1;
+      scrollToSectionWithOffset(id, attempts === 1 ? behavior : "auto");
+
+      const section = document.getElementById(id);
+      if (!section) return;
+
+      const headerOffset =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--site-header-offset"),
+        ) || 0;
+      const expectedTop = Math.round(headerOffset + 8);
+      const currentTop = Math.round(section.getBoundingClientRect().top);
+      const isAligned = Math.abs(currentTop - expectedTop) <= 8;
+
+      // Home content is async; keep correcting briefly while layout settles.
+      if (!isAligned && attempts < 9) {
+        retryTimer = window.setTimeout(alignToTarget, 180);
       }
     };
 
-    scrollToTarget();
-
-    const t1 = window.setTimeout(scrollToTarget, 100);
-    const t2 = window.setTimeout(scrollToTarget, 280);
-    const t3 = window.setTimeout(scrollToTarget, 520);
+    requestAnimationFrame(alignToTarget);
 
     return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      window.clearTimeout(t3);
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
     };
   }, [location.key, location.state?.scrollToId]);
 
@@ -79,7 +109,7 @@ function Home() {
 
     const clearState = window.setTimeout(() => {
       navigate(location.pathname, { replace: true, state: {} });
-    }, 900);
+    }, 2200);
 
     return () => window.clearTimeout(clearState);
   }, [location.key, location.pathname, navigate, location.state?.scrollToId]);

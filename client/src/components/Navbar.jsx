@@ -68,19 +68,27 @@ function Navbar() {
   const scrollMotion = () =>
     window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 
+  const scrollToSectionWithOffset = (id, behavior = scrollMotion()) => {
+    const section = document.getElementById(id);
+    if (!section) return;
+
+    const headerOffset =
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--site-header-offset")) ||
+      0;
+    const top = section.getBoundingClientRect().top + window.scrollY - headerOffset - 8;
+
+    window.scrollTo({
+      top: Math.max(0, top),
+      behavior,
+    });
+  };
+
   const goToSection = (id) => {
     setMenuOpen(false);
     if (location.pathname === "/") {
       const behavior = scrollMotion();
-      const run = () => {
-        const section = document.getElementById(id);
-        if (section) {
-          section.scrollIntoView({ behavior, block: "start" });
-        }
-      };
-      requestAnimationFrame(() => requestAnimationFrame(run));
-      window.setTimeout(run, 100);
-      window.setTimeout(run, 280);
+      // Single deterministic scroll avoids delayed "jump back" from stacked retries.
+      requestAnimationFrame(() => scrollToSectionWithOffset(id, behavior));
       return;
     }
     navigate("/", { state: { scrollToId: id } });

@@ -34,6 +34,7 @@ function Home() {
   const [categories, setCategories] = useState([]);
   const loadGen = useRef(0);
   const [refetchTick, setRefetchTick] = useState(0);
+  const pendingSectionIntentRef = useRef(null);
 
   const scrollMotion = () =>
     window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -62,43 +63,18 @@ function Home() {
   useLayoutEffect(() => {
     const id = location.state?.scrollToId;
     if (!id || typeof id !== "string") {
+      pendingSectionIntentRef.current = null;
       return undefined;
     }
 
+    pendingSectionIntentRef.current = id;
     window.scrollTo(0, 0);
 
-    const behavior = scrollMotion();
-    let attempts = 0;
-    let retryTimer = null;
+    const rafId = requestAnimationFrame(() => {
+      scrollToSectionWithOffset(id, scrollMotion());
+    });
 
-    const alignToTarget = () => {
-      attempts += 1;
-      scrollToSectionWithOffset(id, attempts === 1 ? behavior : "auto");
-
-      const section = document.getElementById(id);
-      if (!section) return;
-
-      const headerOffset =
-        parseFloat(
-          getComputedStyle(document.documentElement).getPropertyValue("--site-header-offset"),
-        ) || 0;
-      const expectedTop = Math.round(headerOffset + 8);
-      const currentTop = Math.round(section.getBoundingClientRect().top);
-      const isAligned = Math.abs(currentTop - expectedTop) <= 8;
-
-      // Home content is async; keep correcting briefly while layout settles.
-      if (!isAligned && attempts < 9) {
-        retryTimer = window.setTimeout(alignToTarget, 180);
-      }
-    };
-
-    requestAnimationFrame(alignToTarget);
-
-    return () => {
-      if (retryTimer) {
-        window.clearTimeout(retryTimer);
-      }
-    };
+    return () => window.cancelAnimationFrame(rafId);
   }, [location.key, location.state?.scrollToId]);
 
   useEffect(() => {
@@ -107,9 +83,40 @@ function Home() {
       return undefined;
     }
 
+    // After async cards load, do one quiet realignment for exact target placement.
+    const t1 = window.setTimeout(() => {
+      if (pendingSectionIntentRef.current === id) {
+        scrollToSectionWithOffset(id, "auto");
+      }
+    }, 140);
+    const t2 = window.setTimeout(() => {
+      if (pendingSectionIntentRef.current === id) {
+        scrollToSectionWithOffset(id, "auto");
+      }
+    }, 420);
+
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [
+    location.key,
+    location.state?.scrollToId,
+    bestProducts.length,
+    reviews.length,
+    categories.length,
+  ]);
+
+  useEffect(() => {
+    const id = location.state?.scrollToId;
+    if (!id || typeof id !== "string") {
+      return undefined;
+    }
+
     const clearState = window.setTimeout(() => {
+      pendingSectionIntentRef.current = null;
       navigate(location.pathname, { replace: true, state: {} });
-    }, 2200);
+    }, 1200);
 
     return () => window.clearTimeout(clearState);
   }, [location.key, location.pathname, navigate, location.state?.scrollToId]);

@@ -4,7 +4,8 @@ A full-stack **coffee shop** web app: browse categories, build a cart, check out
 
 ## Live at
 
-_Add your deployed site URL here._
+https://beancraft-mern.vercel.app/
+
 
 ---
 
